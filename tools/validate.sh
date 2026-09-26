@@ -11,6 +11,10 @@ usage() {
 run_static_checks() {
     local actionlint_bin
     local test_dir
+    local gc_sections="-Wl,--gc-sections"
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        gc_sections="-Wl,-dead_strip"
+    fi
 
     python3 tools/check_repo.py
 
@@ -24,6 +28,15 @@ run_static_checks() {
     "${actionlint_bin}" -color .github/workflows/*.yml
 
     test_dir="$(mktemp -d /tmp/ai-passport-host-tests.XXXXXX)"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_key_analyzer.c main/pitch_detector.c main/key_analyzer.c main/key_control.c \
+        -lm -o "${test_dir}/test_key_analyzer"
+    "${test_dir}/test_key_analyzer"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -O2 -Imain \
+        tests/test_key_robustness.c main/pitch_detector.c main/key_analyzer.c \
+        -lm -o "${test_dir}/test_key_robustness"
+    "${test_dir}/test_key_robustness"
+    PYTHONDONTWRITEBYTECODE=1 python3 tests/test_key_assets.py
     "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
         tests/test_ui_pixel_math.c main/ui_pixel_math.c \
         -o "${test_dir}/test_ui_pixel_math"
@@ -54,10 +67,19 @@ run_static_checks() {
         tests/test_bsp_audio_recovery.c components/bsp/src/bsp_es8311_sleep_check.c \
         -o "${test_dir}/test_bsp_audio_recovery"
     "${test_dir}/test_bsp_audio_recovery"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror \
+        -Itests/audio_stubs -Icomponents/bsp/include -Icomponents/bsp/src -Imain \
+        tests/test_key_audio.c main/key_audio.c components/bsp/src/bsp_es8311_sleep_check.c \
+        -o "${test_dir}/test_key_audio"
+    "${test_dir}/test_key_audio"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Itests/demo_stubs -Imain \
+        tests/test_key_runtime.c main/key_audio.c main/key_control.c \
+        main/key_analyzer.c main/pitch_detector.c -lm -o "${test_dir}/test_key_runtime"
+    "${test_dir}/test_key_runtime"
     for demo in audio low_power ble wifi; do
         "${CC:-cc}" -std=c11 -Wall -Wextra -Werror \
             -ffunction-sections -fdata-sections -Itests/demo_stubs -Imain \
-            "tests/test_demo_${demo}_runtime.c" -Wl,--gc-sections \
+            "tests/test_demo_${demo}_runtime.c" "${gc_sections}" \
             -o "${test_dir}/test_demo_${demo}_runtime"
         "${test_dir}/test_demo_${demo}_runtime"
     done

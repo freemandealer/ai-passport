@@ -1,5 +1,7 @@
 **English** · [简体中文](/docs/README.zh_CN.md)
 
+**Application branch:** [Sonic Key Radar](key-radar.md) is the offline hold-to-listen key estimator. The hardware-test overview below describes the upstream baseline.
+
 <h1 align="center">FoloToy AI PASSPORT</h1>
 
 <p align="center">

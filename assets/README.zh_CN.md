@@ -15,6 +15,30 @@
 - 添加字库前评估 Flash 与内部 RAM 影响；ESP32-C3 无 PSRAM。
 - 不提交许可不允许分发的字库。
 
+### 声调雷达字体
+
+[Noto Sans CJK SC Regular](https://github.com/notofonts/noto-cjk/tree/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans)
+以 [`fonts/NotoSansCJKsc-Regular.otf`](fonts/NotoSansCJKsc-Regular.otf) 保存，遵循
+[SIL Open Font License](fonts/OFL.txt)。源文件 SHA-256：
+`2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b`。
+
+`fonts/key_font_14.c`、`fonts/key_font_20.c` 为未压缩的 4 bpp 子集，通过
+`main/CMakeLists.txt` 编译；原始 OTF 仅供再生成，不嵌入固件。
+`main/key_text.h` 定义固定文案；`fonts/key-characters.txt` 和 `main/key_glyphs.h`
+记录所需字形与可打印 ASCII。再生成命令：
+
+```sh
+npm install --prefix .tools --no-audit --no-fund lv_font_conv@1.5.3
+python3 tools/generate_key_fonts.py
+```
+
+脚本检查转换器版本为 1.5.3，选择 14/20 px 并传入
+`--symbols`、`--bpp 4 --format lvgl --no-compress --no-kerning --lv-include lvgl.h`。
+静态验证检查源文件哈希和清单。真实 LVGL 渲染器检查所有字形描述、已知缺字
+反向用例、实际控件字体和文字边界。物理中文显示仍待实机验证。
+应用雷达图形由 `main/key_ui.c` 代码绘制，遵循项目 MIT 许可证。
+参见[声调雷达](../docs/key-radar.zh_CN.md)。
+
 ## 图片（images）
 
 可复用的源图与生成的显示资产放在 `images/`。

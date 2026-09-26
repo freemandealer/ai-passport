@@ -1,5 +1,7 @@
 [English](/docs/README.md) · **简体中文**
 
+**当前应用分支：**[声调雷达](key-radar.zh_CN.md)提供离线按住倾听、松开判定调性。下方硬件测试介绍说明上游基线。
+
 <h1 align="center">FoloToy AI PASSPORT</h1>
 
 <p align="center">

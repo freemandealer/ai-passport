@@ -48,7 +48,22 @@ BaseType_t xSemaphoreTake(SemaphoreHandle_t sem, TickType_t ticks);
 void vSemaphoreDelete(SemaphoreHandle_t sem);
 
 typedef enum { BSP_BTN_UP, BSP_BTN_DOWN, BSP_BTN_OK } bsp_btn_t;
-typedef enum { BSP_BTN_PRESS, BSP_BTN_CLICK, BSP_BTN_DOUBLE, BSP_BTN_LONG } bsp_btn_ev_t;
+typedef enum { BSP_BTN_PRESS, BSP_BTN_CLICK, BSP_BTN_DOUBLE, BSP_BTN_LONG, BSP_BTN_RELEASE } bsp_btn_ev_t;
+typedef void *QueueHandle_t;
+QueueHandle_t xQueueCreate(unsigned count, unsigned size);
+BaseType_t xQueueOverwrite(QueueHandle_t queue, const void *value);
+BaseType_t xQueuePeek(QueueHandle_t queue, void *value, TickType_t timeout);
+unsigned uxTaskGetStackHighWaterMark(TaskHandle_t task);
+esp_err_t bsp_audio_init(void);
+esp_err_t bsp_battery_init(void);
+int bsp_battery_soc(void);
+esp_err_t bsp_display_init(void);
+void *bsp_lvgl_init(void);
+esp_err_t bsp_button_init(void (*callback)(bsp_btn_t, bsp_btn_ev_t, void *), void *user);
+#define ESP_ERROR_CHECK(value) do { if ((value) != ESP_OK) __builtin_trap(); } while (0)
+#define MALLOC_CAP_8BIT 1
+size_t heap_caps_get_largest_free_block(unsigned caps);
+size_t esp_get_free_heap_size(void);
 esp_err_t bsp_audio_set_format(uint32_t hz, uint8_t bits, uint8_t channels);
 void bsp_audio_set_volume(uint8_t percent);
 esp_err_t bsp_audio_read(void *pcm, size_t bytes);

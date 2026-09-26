@@ -11,3 +11,6 @@ managed_components/
 /.agents/skills/passport-build
 /.agents/skills/passport-device-test
 /.agents/skills/passport-debug
+
+# Local font converter installation; generated assets are tracked in assets/.
+/.tools/

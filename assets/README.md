@@ -17,6 +17,31 @@ Store reusable font files and generated font sources in `fonts/`.
 - Check Flash and internal-RAM impact before adding a font; the ESP32-C3 has no PSRAM.
 - Do not commit fonts whose license does not permit redistribution.
 
+### Sonic Key Radar fonts
+
+[Noto Sans CJK SC Regular](https://github.com/notofonts/noto-cjk/tree/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans)
+is vendored as [`fonts/NotoSansCJKsc-Regular.otf`](fonts/NotoSansCJKsc-Regular.otf)
+under the [SIL Open Font License](fonts/OFL.txt). Source SHA-256:
+`2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b`.
+
+`fonts/key_font_14.c` and `fonts/key_font_20.c` are uncompressed 4 bpp subsets,
+compiled by `main/CMakeLists.txt`; the OTF is for reproducibility and is not embedded.
+`main/key_text.h` owns fixed strings; `fonts/key-characters.txt` and
+`main/key_glyphs.h` record required glyphs plus printable ASCII. Regenerate with:
+
+```sh
+npm install --prefix .tools --no-audit --no-fund lv_font_conv@1.5.3
+python3 tools/generate_key_fonts.py
+```
+
+The generator verifies converter version 1.5.3, selects sizes 14/20 and passes
+`--symbols`, `--bpp 4 --format lvgl --no-compress --no-kerning --lv-include lvgl.h`.
+Source hash/inventory tests run in the static gate. The real LVGL renderer checks
+all glyph descriptors, a missing-glyph negative case, actual widget bindings and
+text bounds. Physical Chinese output remains unverified until device testing.
+The application's radar geometry is code-native in `main/key_ui.c`, under the
+project MIT license. See [Sonic Key Radar](../docs/key-radar.md).
+
 ## Images
 
 Store reusable source images and generated display assets in `images/`.
