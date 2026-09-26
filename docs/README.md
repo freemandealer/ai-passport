@@ -1,5 +1,8 @@
 **English** · [简体中文](/docs/README.zh_CN.md)
 
+**Application branch:** [GREEN ROOM](guitar-score.md) provides editable guitar
+chord charts and an audible/visual eighth-note metronome. The overview below describes the hardware baseline.
+
 <h1 align="center">FoloToy AI PASSPORT</h1>
 
 <p align="center">

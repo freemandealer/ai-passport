@@ -15,6 +15,33 @@
 - 添加字库前评估 Flash 与内部 RAM 影响；ESP32-C3 无 PSRAM。
 - 不提交许可不允许分发的字库。
 
+### GREEN ROOM 中文字库
+
+复用本地既有项目中已获许可的 [Noto Sans CJK SC Regular](https://github.com/notofonts/noto-cjk/tree/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans)，
+保存为 [`fonts/NotoSansCJKsc-Regular.otf`](fonts/NotoSansCJKsc-Regular.otf)，
+遵循 [SIL Open Font License](fonts/OFL.txt)。源文件 SHA-256：
+`2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b`。
+
+[`fonts/guitar_font_16.c`](fonts/guitar_font_16.c) 与
+[`fonts/guitar_font_24.c`](fonts/guitar_font_24.c) 是 16／24 px、未压缩 2 bpp 字库，
+由 `main/CMakeLists.txt` 编译；原始 OTF 不嵌入固件。覆盖 ASCII U+0020～U+007E、
+20,976 个 U+4E00～U+9FEF 汉字及[应用指南](../docs/guitar-score.zh_CN.md)列出的八种标点。
+生成位图超过 1 MiB，必须启用 `CONFIG_LV_FONT_FMT_TXT_LARGE=y`；字体数据位于 Flash。
+用户歌名使用 16 px，和弦名后大字号注释使用 24 px 回退字体。主机渲染测试验证字形描述符、
+已知缺字反例、布局及 24 KiB LVGL 内存池，实际显示仍需设备验证。
+
+使用固定版本转换器复现，无需全局安装：
+
+```sh
+npm install --prefix .tools --no-audit --no-fund lv_font_conv@1.5.3
+python3 tools/generate_guitar_font.py
+```
+
+生成器检查字体哈希和转换器版本，并传入精确字符范围与
+`--size 16`／`--size 24`、`--bpp 2 --format lvgl --no-compress --no-kerning`。
+拉丁和弦名、数字使用 LVGL Montserrat 字体；和弦图及其余界面直接由代码绘制，
+遵循项目许可证。
+
 ## 图片（images）
 
 可复用的源图与生成的显示资产放在 `images/`。

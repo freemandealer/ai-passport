@@ -1,16 +1,16 @@
 idf_component_register(
     SRCS "main.c"
-         "demo_navigation.c"
-         "ui_pixel.c"
-         "ui_pixel_math.c"
-         "demo_display.c"
-         "demo_button.c"
-         "demo_audio.c"
-         "demo_battery.c"
-         "demo_radio.c"
-         "demo_wifi.c"
-         "demo_ble.c"
-         "demo_low_power.c"
+         "guitar_score.c"
+         "guitar_shapes.c"
+         "guitar_player.c"
+         "guitar_metronome.c"
+         "guitar_audio.c"
+         "guitar_battery.c"
+         "guitar_ui.c"
+         "guitar_service.c"
+         "../assets/fonts/guitar_font_16.c"
+         "../assets/fonts/guitar_font_24.c"
     INCLUDE_DIRS "."
-    REQUIRES bsp bt esp_event esp_hw_support esp_netif esp_timer esp_wifi nvs_flash
+    REQUIRES bsp esp_event esp_hw_support esp_http_server esp_netif esp_timer esp_wifi nvs_flash
+    EMBED_TXTFILES "guitar_editor.html"
 )

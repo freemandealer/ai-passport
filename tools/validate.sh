@@ -11,6 +11,10 @@ usage() {
 run_static_checks() {
     local actionlint_bin
     local test_dir
+    local gc_sections="-Wl,--gc-sections"
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        gc_sections="-Wl,-dead_strip"
+    fi
 
     python3 tools/check_repo.py
 
@@ -24,6 +28,24 @@ run_static_checks() {
     "${actionlint_bin}" -color .github/workflows/*.yml
 
     test_dir="$(mktemp -d /tmp/ai-passport-host-tests.XXXXXX)"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_guitar.c main/guitar_score.c main/guitar_player.c main/guitar_shapes.c \
+        -o "${test_dir}/test_guitar"
+    "${test_dir}/test_guitar"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_guitar_metronome.c main/guitar_metronome.c -o "${test_dir}/test_guitar_metronome"
+    "${test_dir}/test_guitar_metronome"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror \
+        -Itests/guitar_audio_stubs -Itests/guitar_stubs -Icomponents/bsp/include -Imain \
+        tests/test_guitar_audio.c main/guitar_metronome.c -o "${test_dir}/test_guitar_audio"
+    "${test_dir}/test_guitar_audio"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror \
+        -Itests/guitar_audio_stubs -Itests/guitar_stubs -Icomponents/bsp/include -Imain \
+        tests/test_guitar_battery.c -o "${test_dir}/test_guitar_battery"
+    "${test_dir}/test_guitar_battery"
+    "${CC:-cc}" -std=gnu11 -Wall -Wextra -Werror -Itests/guitar_stubs -Imain \
+        tests/test_guitar_service.c main/guitar_score.c -o "${test_dir}/test_guitar_service"
+    "${test_dir}/test_guitar_service"
     "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
         tests/test_ui_pixel_math.c main/ui_pixel_math.c \
         -o "${test_dir}/test_ui_pixel_math"
@@ -57,7 +79,7 @@ run_static_checks() {
     for demo in audio low_power ble wifi; do
         "${CC:-cc}" -std=c11 -Wall -Wextra -Werror \
             -ffunction-sections -fdata-sections -Itests/demo_stubs -Imain \
-            "tests/test_demo_${demo}_runtime.c" -Wl,--gc-sections \
+            "tests/test_demo_${demo}_runtime.c" "${gc_sections}" \
             -o "${test_dir}/test_demo_${demo}_runtime"
         "${test_dir}/test_demo_${demo}_runtime"
     done

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GREEN ROOM · 吉他曲谱</title>
+<style>
+:root{color-scheme:dark;--bg:#080f0b;--card:#101e15;--green:#91f9ac;--dim:#87a890;--line:#2b4532}
+[hidden]{display:none!important}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#e4f5e7;font:16px/1.6 system-ui,sans-serif}
+main{max-width:1060px;margin:auto;padding:38px 24px}header{display:flex;align-items:end;justify-content:space-between;gap:20px;border-bottom:1px solid var(--line);padding-bottom:25px}h1{font:600 clamp(27px,6vw,42px)/1.1 ui-monospace,monospace;letter-spacing:-1px;margin:8px 0}h2{font-size:17px;margin-top:0}.eyebrow,.tag{font:12px ui-monospace,monospace;color:var(--green);letter-spacing:2px}.tag{border:1px solid var(--line);padding:8px;white-space:nowrap}p{color:var(--dim);margin:8px 0}.layout{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:24px;margin-top:26px}label{display:flex;justify-content:space-between;margin-bottom:10px}#size{font:12px ui-monospace,monospace;color:var(--dim)}textarea{width:100%;min-height:485px;resize:vertical;tab-size:2;border:1px solid var(--line);border-radius:6px;background:#0c1710;color:#dff8e5;padding:20px;font:16px/1.85 ui-monospace,monospace;outline:none}textarea:focus{border-color:var(--green);box-shadow:0 0 0 2px #91f9ac18}button,.file{font:inherit;font-size:14px;padding:10px 15px;border:1px solid var(--line);border-radius:4px;background:var(--card);color:#e4f5e7;cursor:pointer;display:inline-block}button:hover,.file:hover{border-color:var(--green)}button.primary{color:#07100a;background:var(--green);border-color:var(--green);font-weight:700}button:disabled{opacity:.45;cursor:wait}.actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.file{margin:0}input[type=file]{display:none}aside{border:1px solid var(--line);padding:20px;border-radius:6px;align-self:start}pre{font:14px/1.7 ui-monospace,monospace;color:var(--green);padding:14px;background:#07100a;border-radius:4px}code{color:var(--green)}small{color:var(--dim);font-size:13px}.notice{margin:16px 0;border-left:2px solid var(--green);padding-left:12px;font-size:14px}#status{min-height:28px;margin-top:8px;color:var(--green);white-space:pre-wrap}#status.error{color:#ffc68b}details{margin-top:20px;border-top:1px solid var(--line);padding-top:14px}summary{cursor:pointer;color:var(--green)}footer{margin-top:28px;font:12px ui-monospace,monospace;color:var(--dim)}@media(max-width:750px){main{padding:24px 16px}.layout{grid-template-columns:1fr}.tag{display:none}textarea{min-height:390px}aside{margin-top:4px}}
+</style>
+<main>
+<header><div><div class="eyebrow">FOLOTOY AI PASSPORT / GUITAR</div><h1>GREEN ROOM</h1><p>把和弦写下来，跟着四拍向前。</p></div><div class="tag">4/4 · LOCAL SCORE EDITOR</div></header>
+<div class="layout"><section>
+<label for="score"><b>弹唱曲谱</b><span id="size">0 / 4096 字节</span></label>
+<textarea id="score" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="format" disabled></textarea>
+<div class="actions"><button id="save" class="primary" disabled>保存到设备</button><button id="validate" disabled>检查曲谱</button><button id="download" disabled>导出文本</button><label class="file">导入文本<input id="file" type="file" accept=".txt,text/plain" disabled></label><button id="retry" hidden>重新读取</button></div>
+<div id="status" role="status" aria-live="polite">正在读取设备曲谱…</div>
+<p class="notice">连接设备的 Guitar-XXXX 免密码热点，浏览器打开 192.168.4.1。保存成功会暂停设备播放并返回第一首歌。曲谱保存在设备内，断电后保留。校验失败时原谱不变。</p>
+</section><aside id="format"><h2>一格和弦，四拍时间</h2><p>每首歌从独立一行 <code>---</code> 开始。随后三行依次为歌名、调号、默认 BPM。</p><pre>---
+绿光练习
+C
+80
+C(轻扫) C Am(分解) Am
+F F G G
+---
+小调漫步
+Am
+70
+1(前奏) 4 V7 1</pre><small>空格或换行分隔小节。重复弹两小节，就写两次。支持混写和弦名与级数。</small>
+<p>在和弦或级数后写 <code>(注释内容)</code>，例如 <code>C(轻扫)</code> 或 <code>6 (分解 轻弹)</code>。注释不增加小节；设备显示「和弦名 注释内容」，该小节不显示和弦图。</p>
+<details><summary>支持的语法</summary><p>调号：C、D、E、F、G、A、B，可带 # 或 b；小调附 m，例如 F#m。</p><p>数字 1～7 按调号生成自然大小调的顺阶三和弦。罗马大写为大和弦、小写为小和弦，例如 IV、vi。支持 bVII、#4m。</p><p>后缀：m、7、maj7、m7、dim、dim7、m7b5、aug、sus2、sus4、5、6、m6、add9。例：G7、4maj7、ii7。大和弦可用 maj 显式指定。</p><p>暂不支持斜杠转位、歌词、节拍变更或重复符号。BPM 限 30～120 的整数；设备调速以 1 BPM 步进。</p><p>最多 16 首歌、总计 512 小节、4096 UTF-8 字节。歌名最多 24 字，支持基本汉字、英文和常见中文标点，不支持表情或扩展汉字。</p></details>
+<p><small>每个小节最多一条注释、24 字；使用英文半角括号，可含空格，不可换行或嵌套。注释支持与歌名相同的字符；较长内容在设备上滚动显示。</small></p>
+<details><summary>设备按键</summary><p>上下键：前后小节。双击上：回曲首；双击下：前进两小节。长按下：调速，30～120 BPM、每格 1。长按上：音量，0～10、每格 1，0 为静音。设置中上下键调整、确认键选定。</p><p>确认：播放 / 暂停，播放前四拍预备。长按确认：选曲与 Wi-Fi 信息。</p><p>右侧四格按 1 亮、1 暗、2 亮、2 暗…循环，每次变化为一个八分音符，并嘀一声。正拍声音更强、音色更厚，反拍更轻、更短。声音随播放、暂停和速度同步，末小节完成后停止。</p></details>
+</aside></div><footer>YOUR SONGS STAY ON YOUR PASSPORT. / 192.168.4.1</footer>
+</main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id), editor=$('score'), status=$('status');
+let saved='', busy=false, loaded=false;
+function say(message,error=false){status.textContent=message;status.className=error?'error':'';}
+function update(){const bytes=new TextEncoder().encode(editor.value).length;$('size').textContent=bytes+' / 4096 字节';$('size').style.color=bytes>4096?'#ffc68b':'';for(const id of ['save','validate'])$(id).disabled=busy||!loaded||bytes===0||bytes>4096;$('download').disabled=!loaded;}
+async function load(){busy=true;update();try{const r=await fetch('/api/score',{cache:'no-store'});if(!r.ok)throw Error('读取失败，请确认仍连接设备热点');saved=await r.text();editor.value=saved;editor.disabled=false;$('file').disabled=false;loaded=true;$('retry').hidden=true;say('已读取设备曲谱，可以开始编辑。');}catch(e){say(e.message,true);$('retry').hidden=false;}finally{busy=false;update();}}
+async function submit(save){if(busy||!loaded)return;busy=true;editor.disabled=true;$('file').disabled=true;update();const body=editor.value;say(save?'正在保存，请保持热点连接…':'正在检查曲谱…');try{const r=await fetch(save?'/api/score':'/api/validate',{method:'POST',headers:{'Content-Type':'text/plain; charset=utf-8','X-Guitar-Edit':'1'},body});const message=await r.text();if(!r.ok)throw Error(message);if(save)saved=body;say(message);}catch(e){say(e.message+'（当前编辑内容已保留，可重试。）',true);}finally{busy=false;editor.disabled=false;$('file').disabled=false;update();}}
+editor.addEventListener('input',()=>{update();say(editor.value===saved?'与设备已保存版本一致。':'有未保存的修改。');});
+$('save').onclick=()=>submit(true);$('validate').onclick=()=>submit(false);$('retry').onclick=load;
+$('download').onclick=()=>{const a=document.createElement('a');const url=URL.createObjectURL(new Blob([editor.value],{type:'text/plain;charset=utf-8'}));a.href=url;a.download='guitar-scores.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+$('file').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>4096)throw Error('文件超过 4096 字节');const value=new TextDecoder('utf-8',{fatal:true}).decode(await f.arrayBuffer());editor.value=value;update();say('已导入文本，请检查后保存到设备。');}catch(err){say(err.message,true);}e.target.value='';};
+window.addEventListener('beforeunload',e=>{if(loaded&&editor.value!==saved){e.preventDefault();e.returnValue='';}});
+window.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();if(!$('save').disabled)submit(true);}});
+load();
+</script>
+</html>

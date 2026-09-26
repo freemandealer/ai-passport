@@ -1,5 +1,8 @@
 [English](/docs/README.md) · **简体中文**
 
+**应用分支：**[GREEN ROOM](guitar-score.zh_CN.md) 提供可编辑的吉他弹唱谱与有声／视觉八分音符节拍器。
+下方概览介绍原始硬件基线。
+
 <h1 align="center">FoloToy AI PASSPORT</h1>
 
 <p align="center">
