@@ -200,6 +200,8 @@ LICENSE                  Repository license
 
 ## Documentation index
 
+- [Frog Voice Score](frog-voice-score.md): this branch's offline voice-and-pixel-frog application, controls and validation.
+
 Engineering and contribution guides define the rules; examples and archives
 provide reference material. Choose the entry that matches your task.
 

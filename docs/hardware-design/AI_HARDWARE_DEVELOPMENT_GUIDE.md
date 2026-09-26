@@ -146,6 +146,11 @@ Do not replace the external resistor with the inaccurate internal pull-up. The B
 
 Calibrate thresholds using multiple boards, charge levels, and reasonable temperatures; leave margin between measured distributions rather than relying only on divider theory.
 
+`BSP_BTN_RELEASE` forwards `BUTTON_PRESS_UP`, including release after a long
+hold. It is appended to the public event enum so earlier event values retain
+their meaning. Hold-to-talk applications should use PRESS/RELEASE rather than
+waiting for CLICK, which is delayed and does not represent long-hold release.
+
 ## 7. Shared I2C
 
 I2C0 uses SDA GPIO10 and SCL GPIO7. ES8311 is 7-bit address `0x18`; CW2017 is `0x63`. `bsp_i2c.c` exclusively owns the bus.

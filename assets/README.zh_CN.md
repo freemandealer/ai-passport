@@ -15,6 +15,33 @@
 - 添加字库前评估 Flash 与内部 RAM 影响；ESP32-C3 无 PSRAM。
 - 不提交许可不允许分发的字库。
 
+### 蛙声跳跳字体
+
+应用使用 [Noto Sans CJK SC Regular](https://github.com/notofonts/noto-cjk/tree/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans)，
+源文件保存为 `fonts/NotoSansCJKsc-Regular.otf`，使用 SIL Open Font License，
+许可见 [`fonts/OFL.txt`](fonts/OFL.txt)。源文件 SHA-256：
+`2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b`。
+
+`fonts/frog_font_14.c` 和 `fonts/frog_font_20.c` 是 14／20 像素、4 bpp、
+无压缩 LVGL 字体子集，由 `main/CMakeLists.txt` 编入应用。
+原始 OTF 仅用于复现，不嵌入固件。青蛙与池塘是 `main/frog_ui.c` 中原创的
+代码图形，使用项目 MIT 许可，没有复用 demo 的视觉资产。
+
+`main/frog_text.h` 统一定义固定界面文案。`fonts/frog-characters.txt` 和
+`main/frog_glyphs.h` 记录所有所需码点，包括可打印 ASCII。
+使用固定版本的官方转换器重新生成：
+
+```sh
+npm install --prefix .tools --no-audit --no-fund lv_font_conv@1.5.3
+python3 tools/generate_frog_fonts.py
+```
+
+脚本使用 14／20 像素、`--bpp 4 --format lvgl --no-compress --no-kerning`，
+通过 `--symbols` 指定字符清单，字体名称为 `frog_font_14`／`frog_font_20`。
+`tests/test_frog_assets.py` 检查源文件哈希和字符清单；实际 LVGL 主机渲染器
+检查字形描述符、控件字体和文本边界。中文实机显示仍属于设备验收项。
+详见[应用验证说明](../docs/frog-voice-score.zh_CN.md)。
+
 ## 图片（images）
 
 可复用的源图与生成的显示资产放在 `images/`。
