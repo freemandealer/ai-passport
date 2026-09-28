@@ -150,12 +150,43 @@ are session-only; choosing a song or
 restarting loads the score's default again. Changing the default persistently
 requires saving the text in the editor.
 
+## Automatic idle shutdown
+
+After five minutes without interaction while not playing, the device enters
+deep sleep. This applies to the paused/finished score, song selection, volume,
+tempo, and Wi-Fi information pages. Count-in and playback prevent shutdown;
+pausing or finishing starts a fresh five-minute interval. Any physical button
+press, browser edit/click/scroll, score read, validation, or save restarts it.
+An open browser tab or a connected phone alone does not keep the device awake.
+
+The editor sends activity notifications only following user input, coalesced
+over at most three seconds. Inactivity shuts down the hotspot, audio, battery
+polling, codec, display and backlight. Saved NVS scores remain intact; the
+current bar, temporary tempo/volume and unsaved browser edits are not written
+automatically. The browser retains its unsaved text for export or a later retry.
+
+This uses the existing BSP deep-sleep sequence, not physical power removal.
+The BSP exposes no software control of the independent hardware power button.
+To use the device again, switch hardware power off and on, reconnect to the
+hotspot, and reload or retry the editor. No ADC-button wake or timer wake is
+enabled. Deep-sleep current and the physical power-cycle procedure must be
+verified on the device.
+
 ## Implementation and storage
 
 - `guitar_score` parses bounded text and converts scale degrees independently of
   ESP-IDF/LVGL. `guitar_shapes` supplies 180 root/quality voicings.
 - `guitar_player` uses absolute monotonic time and integer rational boundaries,
   with no accumulated rounded-period drift at speeds such as 95 BPM.
+- `guitar_idle` tests the five-minute boundary independently of ESP-IDF/LVGL.
+  A 32-bit atomic activity counter arbitrates user input against the final
+  shutdown claim without blocking button callbacks. After the claim, new
+  edits are rejected. The shutdown owner releases the model mutex before
+  draining HTTP, then requests cooperative worker exits and waits up to eight
+  seconds for audio/battery acknowledgments. It suspends CW2017 before ES8311,
+  releases I2S then I2C, locks LVGL, sleeps the LCD, and enters deep sleep.
+  HTTP stop/worker timeout or failed LVGL locking causes a safe restart;
+  peripheral suspend errors are logged and terminal shutdown continues.
 - The application worker owns transport; button callbacks only enqueue actions.
   A separate battery worker prevents I2C timeouts from delaying beat calculation.
   It retries failed gauge initialization every five seconds instead of keeping
@@ -204,6 +235,10 @@ distinct strong/weak PCM, pause/resume/song end, and worker/codec failure paths.
 Battery worker tests cover initialization/read recovery, missing gauges, invalid
 SOC, 0% and 100%, and bounded retry intervals. Tempo tests cover one-BPM steps
 and exact restoration of non-multiple-of-five values.
+Idle/shutdown tests cover exact timeout boundaries on every page, playback and
+count-in exclusion, activity resets, worker acknowledgments, HTTP shutdown
+rejection, peripheral order, and restart on terminal preparation failures.
+Browser checks verify interaction notifications cease when the user stops.
 It also retains the baseline repository/BSP host tests. macOS uses the matching
 linker dead-strip option; Linux keeps its existing section-garbage-collection flag.
 
@@ -240,6 +275,11 @@ explicit flash approval, verify:
    power-cycle persistence and recovery from an interrupted save.
 6. Minimum heap, largest allocation block, task stack high-water marks, button
    responsiveness, audio/display alignment and beat jitter with a phone connected.
+7. Leave each non-playing page untouched for five minutes, then verify the
+   screen/backlight, audio and hotspot stop. Verify playback stays awake beyond
+   five minutes, interaction resets the timer, and merely keeping the browser
+   open does not. Measure sleep current; power-cycle and confirm saved scores
+   reload. Exercise an upload and button press near the timeout boundary.
 
 Deliver the gate's verified `build/FoloToy-AI-Passport-full.bin` at **offset 0x0**,
 with its matching `build/firmware/<sha256>/manifest.json`, ELF and MAP. A merged

@@ -3,6 +3,7 @@
 #include "guitar_ui.h"
 #include "guitar_audio.h"
 #include "guitar_battery.h"
+#include "guitar_power.h"
 #include "bsp_button.h"
 #include "bsp_display.h"
 #include "bsp_i2c.h"
@@ -42,6 +43,10 @@ static void publish_audio(void)
 static esp_err_t apply_score(const guitar_library_t *candidate, const char *text, size_t length)
 {
     if (xSemaphoreTake(s_model_lock, pdMS_TO_TICKS(1000)) != pdTRUE) return ESP_ERR_TIMEOUT;
+    if (guitar_power_closing()) {
+        xSemaphoreGive(s_model_lock);
+        return ESP_ERR_INVALID_STATE;
+    }
     guitar_player_tick(&s_player, &s_library, esp_timer_get_time());
     guitar_player_pause(&s_player);
     publish_audio(); /* Stop future clicks before writing Flash. */
@@ -62,6 +67,7 @@ static esp_err_t apply_score(const guitar_library_t *candidate, const char *text
 static void on_key(bsp_btn_t button, bsp_btn_ev_t event, void *user)
 {
     (void)user;
+    if (!guitar_power_activity()) return; /* Includes PRESS before click delay. */
     guitar_action_t action;
     if (event == BSP_BTN_CLICK) action = button == BSP_BTN_UP ? G_UP : button == BSP_BTN_DOWN ? G_DOWN : G_OK;
     else if (event == BSP_BTN_DOUBLE && button == BSP_BTN_UP) action = G_UP_DOUBLE;
@@ -94,11 +100,10 @@ void app_main(void)
     bsp_display_backlight(80);
     esp_err_t buttons = bsp_button_init(on_key, NULL);
     if (buttons != ESP_OK) ESP_LOGE(TAG, "Buttons unavailable: %s", esp_err_to_name(buttons));
-    if (bsp_i2c_init() == ESP_OK && xTaskCreate(guitar_battery_worker, "guitar_battery", 3072,
-                                             battery_queue, 2, NULL) != pdPASS)
+    if (bsp_i2c_init() == ESP_OK && guitar_battery_start(battery_queue) != ESP_OK)
         ESP_LOGW(TAG, "Battery task unavailable");
     (void)guitar_audio_start();
-    bool network_ready = guitar_service_start(apply_score, &s_network) == ESP_OK;
+    bool network_ready = guitar_service_start(apply_score, guitar_power_activity, &s_network) == ESP_OK;
     xSemaphoreTake(s_model_lock, portMAX_DELAY);
     s_network.ready = network_ready;
     xSemaphoreGive(s_model_lock);
@@ -116,6 +121,14 @@ void app_main(void)
         uint64_t now = esp_timer_get_time();
         guitar_player_tick(&s_player, &s_library, now);
         if (has_input) guitar_player_action(&s_player, &s_library, action, now);
+        bool playing = s_player.transport == G_PLAYING || s_player.transport == G_COUNT_IN;
+        if (guitar_power_idle_due(playing, now)) {
+            guitar_player_pause(&s_player);
+            publish_audio();
+            xSemaphoreGive(s_model_lock);
+            guitar_power_off();
+            return;
+        }
         publish_audio();
         s_network.audio_failed = guitar_audio_status() < 0;
         if (bsp_lvgl_lock(15)) {

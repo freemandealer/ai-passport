@@ -9,9 +9,14 @@ import { chromium } from '../.tools/node_modules/playwright/index.mjs';
 const html = readFileSync('main/guitar_editor.html');
 let stored = '---\n绿光练习\nC\n80\nC C Am Am F F G G\n';
 let failSave = false, saves = 0, failLoad = false;
+let activities = 0;
 const server = createServer(async (req, res) => {
     if (req.url === '/') { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.end(html); return; }
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    if (req.method === 'POST' && req.url === '/api/activity') {
+        assert.equal(req.headers['x-guitar-edit'], '1');
+        ++activities; res.end('OK'); return;
+    }
     if (req.method === 'GET' && req.url === '/api/score') {
         if (failLoad) { res.statusCode = 503; res.end('not ready'); } else res.end(stored);
         return;
@@ -45,12 +50,19 @@ try {
     await page.waitForFunction(() => !document.getElementById('score').disabled);
     assert.equal(await page.locator('#score').inputValue(), stored);
     assert.ok(await page.locator('#retry').isHidden());
+    assert.equal(activities, 0); /* Opening an idle page has no heartbeat. */
     assert.ok((await page.locator('#format').textContent()).includes('(注释内容)'));
     assert.ok((await page.locator('#format').textContent()).includes('长按下：调速'));
     mkdirSync('build/guitar-preview', { recursive: true });
     await page.screenshot({ path: 'build/guitar-preview/editor-desktop.png', fullPage: true });
     const old = stored;
+    const wheelResponse = page.waitForResponse(r => r.url().endsWith('/api/activity') && r.status() === 200);
+    await page.mouse.wheel(0, 10);
+    await wheelResponse;
+    const activityResponse = page.waitForResponse(r => r.url().endsWith('/api/activity') && r.status() === 200);
     await page.locator('#score').fill('---\n新歌\nAm\n95\n1(前奏) 4 (分解 轻弹) V7 1');
+    await activityResponse;
+    assert.ok(activities > 0);
     await page.locator('#validate').click();
     await page.waitForFunction(() => document.getElementById('status').textContent === '校验通过');
     assert.equal(stored, old); assert.equal(saves, 0);
@@ -101,6 +113,10 @@ try {
     failLoad = false;
     await page.locator('#retry').click();
     await page.waitForFunction(() => !document.getElementById('score').disabled);
+    await page.waitForTimeout(3300); /* Let the final interaction notification drain. */
+    const idleActivities = activities;
+    await page.waitForTimeout(3300);
+    assert.equal(activities, idleActivities); /* No recurring keep-awake traffic. */
     assert.deepEqual(errors, []);
     console.log('Browser editor: PASS (read/edit/validate/save/reload/import/export, comments, failures, UTF-8 byte limit, mobile layout)');
 } finally {

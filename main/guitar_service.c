@@ -11,11 +11,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdatomic.h>
 
 static const char *TAG = "guitar_web";
 static char s_text[GUITAR_TEXT_MAX + 1];
 static bool s_nvs_ready;
 static guitar_apply_fn s_apply;
+static guitar_activity_fn s_activity;
+static atomic_bool s_stopping;
+static httpd_handle_t s_server;
+static esp_netif_t *s_ap;
 extern const char editor_start[] asm("_binary_guitar_editor_html_start");
 extern const char editor_end[] asm("_binary_guitar_editor_html_end");
 
@@ -82,9 +87,24 @@ static esp_err_t reply(httpd_req_t *req, const char *status, const char *message
     return httpd_resp_send(req, message, HTTPD_RESP_USE_STRLEN);
 }
 
+static bool active_request(httpd_req_t *req)
+{
+    if (!atomic_load(&s_stopping) && (!s_activity || s_activity())) return true;
+    reply(req, "503 Service Unavailable", "设备正在休眠，请重新开机后连接");
+    return false;
+}
+
+static bool editor_request(httpd_req_t *req)
+{
+    char header[16];
+    return local_host(req) && httpd_req_get_hdr_value_str(req, "X-Guitar-Edit", header, sizeof(header)) == ESP_OK &&
+           !strcmp(header, "1");
+}
+
 static esp_err_t root_get(httpd_req_t *req)
 {
     if (!local_host(req)) return reply(req, "403 Forbidden", "请通过 192.168.4.1 打开编辑器");
+    if (!active_request(req)) return ESP_FAIL;
     httpd_resp_set_type(req, "text/html; charset=utf-8");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     httpd_resp_set_hdr(req, "Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
@@ -95,6 +115,7 @@ static esp_err_t root_get(httpd_req_t *req)
 static esp_err_t score_get(httpd_req_t *req)
 {
     if (!local_host(req)) return reply(req, "403 Forbidden", "无效访问地址");
+    if (!active_request(req)) return ESP_FAIL;
     return reply(req, "200 OK", s_text);
 }
 
@@ -113,11 +134,11 @@ static const char *parse_message(guitar_parse_code_t code)
 
 static esp_err_t receive_score(httpd_req_t *req, bool save)
 {
-    char header[16];
-    if (!local_host(req) || httpd_req_get_hdr_value_str(req, "X-Guitar-Edit", header, sizeof(header)) != ESP_OK || strcmp(header, "1")) {
+    if (!editor_request(req)) {
         reply(req, "403 Forbidden", "请从设备编辑器保存曲谱");
         return ESP_FAIL;
     }
+    if (!active_request(req)) return ESP_FAIL;
     if (req->content_len == 0 || req->content_len > GUITAR_TEXT_MAX) {
         reply(req, "413 Content Too Large", "曲谱大小限 1 至 4096 字节");
         return ESP_FAIL;
@@ -132,6 +153,11 @@ static esp_err_t receive_score(httpd_req_t *req, bool save)
     size_t received = 0;
     unsigned timeouts = 0;
     while (received < req->content_len) {
+        if (atomic_load(&s_stopping)) {
+            free(body); free(candidate);
+            reply(req, "503 Service Unavailable", "设备正在休眠，请重新开机后重试");
+            return ESP_FAIL;
+        }
         int n = httpd_req_recv(req, body + received, req->content_len - received);
         if (n == HTTPD_SOCK_ERR_TIMEOUT && ++timeouts <= 2) continue;
         if (n <= 0) {
@@ -164,9 +190,20 @@ static esp_err_t receive_score(httpd_req_t *req, bool save)
 static esp_err_t score_post(httpd_req_t *req) { return receive_score(req, true); }
 static esp_err_t validate_post(httpd_req_t *req) { return receive_score(req, false); }
 
-esp_err_t guitar_service_start(guitar_apply_fn apply, const guitar_network_info_t *info)
+static esp_err_t activity_post(httpd_req_t *req)
 {
+    if (!editor_request(req)) return reply(req, "403 Forbidden", "无效访问");
+    if (req->content_len) return reply(req, "413 Content Too Large", "无需请求内容");
+    if (!active_request(req)) return ESP_FAIL;
+    return reply(req, "200 OK", "OK");
+}
+
+esp_err_t guitar_service_start(guitar_apply_fn apply, guitar_activity_fn activity, const guitar_network_info_t *info)
+{
+    if (s_server || s_ap) return ESP_ERR_INVALID_STATE;
     s_apply = apply;
+    s_activity = activity;
+    atomic_store(&s_stopping, false);
     esp_err_t err = esp_netif_init();
     if (err != ESP_OK) return err;
     err = esp_event_loop_create_default();
@@ -204,7 +241,8 @@ esp_err_t guitar_service_start(guitar_apply_fn apply, const guitar_network_info_
         {.uri = "/", .method = HTTP_GET, .handler = root_get},
         {.uri = "/api/score", .method = HTTP_GET, .handler = score_get},
         {.uri = "/api/score", .method = HTTP_POST, .handler = score_post},
-        {.uri = "/api/validate", .method = HTTP_POST, .handler = validate_post}
+        {.uri = "/api/validate", .method = HTTP_POST, .handler = validate_post},
+        {.uri = "/api/activity", .method = HTTP_POST, .handler = activity_post}
     };
     for (unsigned i = 0; i < sizeof(handlers) / sizeof(handlers[0]); ++i) {
         err = httpd_register_uri_handler(server, &handlers[i]);
@@ -212,6 +250,8 @@ esp_err_t guitar_service_start(guitar_apply_fn apply, const guitar_network_info_
     }
     ESP_LOGI(TAG, "Editor ready; heap=%lu largest=%lu", (unsigned long)esp_get_free_heap_size(),
              (unsigned long)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+    s_server = server;
+    s_ap = ap;
     return ESP_OK;
 cleanup:
     if (server) httpd_stop(server);
@@ -220,4 +260,23 @@ cleanup:
     esp_netif_destroy_default_wifi(ap);
     ESP_LOGE(TAG, "Editor start failed: %s; local score remains usable", esp_err_to_name(err));
     return err;
+}
+
+esp_err_t guitar_service_stop(void)
+{
+    atomic_store(&s_stopping, true);
+    if (s_server) {
+        esp_err_t err = httpd_stop(s_server);
+        if (err != ESP_OK) return err;
+        s_server = NULL;
+    }
+    if (s_ap) {
+        esp_err_t err = esp_wifi_stop();
+        if (err != ESP_OK) return err;
+        err = esp_wifi_deinit();
+        if (err != ESP_OK) return err;
+        esp_netif_destroy_default_wifi(s_ap);
+        s_ap = NULL;
+    }
+    return ESP_OK;
 }

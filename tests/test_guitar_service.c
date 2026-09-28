@@ -9,6 +9,10 @@ static size_t stored_size, pending_size;
 static esp_err_t init_result, write_result, commit_result;
 static int apply_calls, writes, commits, closed, startup_fail, phase, stopped, destroyed, deinit, http_stopped;
 static guitar_library_t active;
+static unsigned activities;
+static bool closing, stop_during_receive;
+static int stop_error;
+static bool activity(void) { ++activities; return !closing; }
 
 const char *esp_err_to_name(esp_err_t e) { (void)e; return "test"; }
 size_t heap_caps_get_largest_free_block(int cap) { (void)cap; return 50000; }
@@ -62,7 +66,7 @@ esp_err_t esp_wifi_stop(void) { ++stopped; return ESP_OK; }
 esp_err_t esp_wifi_deinit(void) { ++deinit; return ESP_OK; }
 esp_err_t httpd_start(httpd_handle_t *h, const httpd_config_t *c)
 { assert(c->stack_size >= 4096); esp_err_t r = stage(); if (!r) *h = (void *)1; return r; }
-esp_err_t httpd_stop(httpd_handle_t s) { (void)s; ++http_stopped; return ESP_OK; }
+esp_err_t httpd_stop(httpd_handle_t s) { (void)s; ++http_stopped; return stop_error; }
 esp_err_t httpd_register_uri_handler(httpd_handle_t s, const httpd_uri_t *h) { (void)s; (void)h; return stage(); }
 esp_err_t httpd_req_get_hdr_value_str(httpd_req_t *r, const char *key, char *out, size_t n)
 {
@@ -81,6 +85,7 @@ esp_err_t httpd_resp_send(httpd_req_t *r, const char *s, ssize_t n)
 }
 int httpd_req_recv(httpd_req_t *r, char *out, size_t n)
 {
+    if (stop_during_receive) atomic_store(&s_stopping, true);
     if (r->timeouts) { --r->timeouts; return HTTPD_SOCK_ERR_TIMEOUT; }
     if (r->disconnect) return 0;
     if (n > r->chunk) n = r->chunk;
@@ -105,7 +110,14 @@ int main(void)
     guitar_service_load(&active, &info);
     assert(info.storage_ok && active.song_count == 2);
     assert(writes == 0 && commits == 0); /* Loading never creates an AP key. */
-    assert(guitar_service_start(apply, &info) == ESP_OK);
+    assert(guitar_service_start(apply, activity, &info) == ESP_OK);
+    httpd_req_t touch = request(""); touch.uri = "/api/activity";
+    assert(activity_post(&touch) == ESP_OK && activities == 1 && !strncmp(touch.status, "200", 3));
+    touch = request(""); touch.edit = NULL;
+    assert(activity_post(&touch) == ESP_OK && activities == 1 && !strncmp(touch.status, "403", 3));
+    touch = request(""); closing = true;
+    assert(activity_post(&touch) == ESP_FAIL && !strncmp(touch.status, "503", 3));
+    closing = false;
     const char *good = "---\nnew song\nD\n95\n1(轻扫) 4 (分解 轻弹) 5 1\n";
     httpd_req_t req = request(good);
     req.uri = "/api/validate";
@@ -141,6 +153,10 @@ int main(void)
     req = request(good); req.disconnect = true;
     assert(score_post(&req) == ESP_FAIL && !strncmp(req.status, "408", 3));
     assert(apply_calls == 1 && !strcmp(s_text, good));
+    stop_during_receive = true; req = request(good);
+    assert(score_post(&req) == ESP_FAIL && !strncmp(req.status, "503", 3));
+    assert(apply_calls == 1 && !strcmp(stored, good));
+    stop_during_receive = false; atomic_store(&s_stopping, false);
 
     const char *newer = "---\nnewer\nC\n80\nC\n";
     int committed = commits;
@@ -168,9 +184,16 @@ int main(void)
     guitar_service_load(&active, &info);
     assert(!info.storage_ok && guitar_service_save(newer, strlen(newer)) == ESP_ERR_INVALID_STATE);
 
-    for (int fail = 1; fail <= 10; ++fail) {
+    stop_error = ESP_FAIL;
+    assert(guitar_service_stop() == ESP_FAIL && s_server && s_ap);
+    req = request(good);
+    assert(score_post(&req) == ESP_FAIL && !strncmp(req.status, "503", 3));
+    stop_error = ESP_OK;
+    assert(guitar_service_stop() == ESP_OK && !s_server && !s_ap);
+    assert(guitar_service_stop() == ESP_OK);
+    for (int fail = 1; fail <= 11; ++fail) {
         startup_fail = fail; phase = stopped = destroyed = deinit = http_stopped = 0;
-        assert(guitar_service_start(apply, &info) != ESP_OK);
+        assert(guitar_service_start(apply, activity, &info) != ESP_OK);
         assert(destroyed == 1 && deinit == (fail > 1) && stopped == (fail > 5) && http_stopped == (fail > 6));
     }
     assert(closed > 0);

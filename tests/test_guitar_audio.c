@@ -10,6 +10,7 @@ static guitar_audio_clock_t pending;
 static bool available, fail_task;
 static int init_error, format_error, write_error;
 static uint64_t now;
+static uint64_t stop_at;
 static unsigned writes, sleeps, formats, deletes, levels;
 static uint64_t timestamps[10];
 static size_t sizes[10];
@@ -26,6 +27,7 @@ int xQueueReceive(QueueHandle_t queue, void *item, TickType_t wait)
 {
     (void)queue; assert(wait == 5);
     now += 5000;
+    if (now == stop_at) guitar_audio_request_stop();
     if (now == 800000) { guitar_audio_clock_t c = pending; c.active = false; guitar_audio_publish(&c); }
     if (now == 900000) { guitar_audio_clock_t c = pending; c.active = true; c.start_us = now; c.end_us = 1700000; guitar_audio_publish(&c); }
     if (now > 1800000) longjmp(done, 1);
@@ -48,7 +50,7 @@ static void reset(void)
 {
     s_mailbox = NULL; s_published = (guitar_audio_clock_t){0};
     atomic_store(&s_status, 0);
-    available = fail_task = false; now = writes = sleeps = formats = deletes = levels = 0;
+    available = fail_task = false; now = stop_at = writes = sleeps = formats = deletes = levels = 0;
     init_error = format_error = write_error = ESP_OK;
 }
 static int run(void)
@@ -75,6 +77,11 @@ int main(void)
     assert(guitar_audio_status() == -1 && writes == 1 && sleeps == 1);
     reset(); fail_task = true;
     assert(guitar_audio_start() == ESP_ERR_NO_MEM && !s_mailbox && deletes == 1 && guitar_audio_status() == -1);
+    assert(guitar_audio_stopped());
+    reset(); stop_at = 950000; assert(run() == 2);
+    assert(guitar_audio_stopped() && writes == 3 && !sleeps);
+    guitar_audio_request_stop(); /* Repeated requests after acknowledgment are safe. */
+    assert(guitar_audio_stopped());
     puts("Audio worker: PASS (format/codec/task faults, PCM ownership, pause/resume, song end, bounded mailbox)");
     return 0;
 }

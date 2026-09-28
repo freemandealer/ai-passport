@@ -10,11 +10,12 @@
 static const char *TAG = "guitar_audio";
 static QueueHandle_t s_mailbox;
 static atomic_int s_status;
+static atomic_bool s_stop_requested, s_stopped = true;
 static guitar_audio_clock_t s_published;
 
 void guitar_audio_publish(const guitar_audio_clock_t *clock)
 {
-    if (!s_mailbox) return;
+    if (!s_mailbox || atomic_load(&s_stop_requested)) return;
     if (clock->active == s_published.active && clock->start_us == s_published.start_us &&
         clock->end_us == s_published.end_us && clock->volume == s_published.volume && clock->bpm == s_published.bpm) return;
     s_published = *clock;
@@ -22,6 +23,8 @@ void guitar_audio_publish(const guitar_audio_clock_t *clock)
 }
 
 int guitar_audio_status(void) { return atomic_load(&s_status); }
+void guitar_audio_request_stop(void) { atomic_store(&s_stop_requested, true); }
+bool guitar_audio_stopped(void) { return atomic_load(&s_stopped); }
 
 static void worker(void *arg)
 {
@@ -37,6 +40,12 @@ static void worker(void *arg)
         int16_t pcm[GUITAR_CLICK_SAMPLES];
         for (;;) {
             (void)xQueueReceive(s_mailbox, &config, pdMS_TO_TICKS(5));
+            if (atomic_load(&s_stop_requested)) {
+                /* The shutdown coordinator owns the final suspend sequence. */
+                atomic_store(&s_stopped, true);
+                vTaskDelete(NULL);
+                return;
+            }
             bool accent;
             if (!guitar_click_poll(&clock, &config, esp_timer_get_time(), &accent)) continue;
             size_t count = guitar_click_pcm(accent, config.volume, pcm, GUITAR_CLICK_SAMPLES);
@@ -49,17 +58,21 @@ static void worker(void *arg)
     atomic_store(&s_status, -1);
     ESP_LOGE(TAG, "Audio unavailable: %s", esp_err_to_name(err));
     (void)bsp_audio_sleep(); /* This worker has stopped all PCM I/O. */
+    atomic_store(&s_stopped, true);
     vTaskDelete(NULL);
 }
 
 esp_err_t guitar_audio_start(void)
 {
     if (s_mailbox) return ESP_ERR_INVALID_STATE;
+    atomic_store(&s_stop_requested, false);
+    atomic_store(&s_stopped, false);
     s_mailbox = xQueueCreate(1, sizeof(guitar_audio_clock_t));
     if (!s_mailbox || xTaskCreate(worker, "guitar_audio", 4096, NULL, 6, NULL) != pdPASS) {
         if (s_mailbox) vQueueDelete(s_mailbox);
         s_mailbox = NULL;
         atomic_store(&s_status, -1);
+        atomic_store(&s_stopped, true);
         return ESP_ERR_NO_MEM;
     }
     return ESP_OK;

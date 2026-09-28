@@ -17,6 +17,7 @@ main{max-width:1060px;margin:auto;padding:38px 24px}header{display:flex;align-it
 <div class="actions"><button id="save" class="primary" disabled>保存到设备</button><button id="validate" disabled>检查曲谱</button><button id="download" disabled>导出文本</button><label class="file">导入文本<input id="file" type="file" accept=".txt,text/plain" disabled></label><button id="retry" hidden>重新读取</button></div>
 <div id="status" role="status" aria-live="polite">正在读取设备曲谱…</div>
 <p class="notice">连接设备的 Guitar-XXXX 免密码热点，浏览器打开 192.168.4.1。保存成功会暂停设备播放并返回第一首歌。曲谱保存在设备内，断电后保留。校验失败时原谱不变。</p>
+<p class="notice">未播放且连续 5 分钟无操作时，设备自动进入深度休眠。按键或网页编辑操作会重新计时；仅保持网页打开不会阻止休眠。再次使用请通过独立电源键关闭后重新开机，并重新连接热点。</p>
 </section><aside id="format"><h2>一格和弦，四拍时间</h2><p>每首歌从独立一行 <code>---</code> 开始。随后三行依次为歌名、调号、默认 BPM。</p><pre>---
 绿光练习
 C
@@ -38,6 +39,11 @@ Am
 'use strict';
 const $=id=>document.getElementById(id), editor=$('score'), status=$('status');
 let saved='', busy=false, loaded=false;
+// Notify only in response to user interaction, never with an idle heartbeat.
+let activityPending=false, activityTimer;
+async function pingActivity(){activityPending=false;try{await fetch('/api/activity',{method:'POST',headers:{'X-Guitar-Edit':'1'}});}catch{} }
+function userActivity(){if(!loaded)return;activityPending=true;if(activityTimer)return;pingActivity();activityTimer=setTimeout(()=>{activityTimer=undefined;if(activityPending)pingActivity();},3000);}
+for(const event of ['input','pointerdown','keydown','wheel'])document.addEventListener(event,userActivity,{passive:true});
 function say(message,error=false){status.textContent=message;status.className=error?'error':'';}
 function update(){const bytes=new TextEncoder().encode(editor.value).length;$('size').textContent=bytes+' / 4096 字节';$('size').style.color=bytes>4096?'#ffc68b':'';for(const id of ['save','validate'])$(id).disabled=busy||!loaded||bytes===0||bytes>4096;$('download').disabled=!loaded;}
 async function load(){busy=true;update();try{const r=await fetch('/api/score',{cache:'no-store'});if(!r.ok)throw Error('读取失败，请确认仍连接设备热点');saved=await r.text();editor.value=saved;editor.disabled=false;$('file').disabled=false;loaded=true;$('retry').hidden=true;say('已读取设备曲谱，可以开始编辑。');}catch(e){say(e.message,true);$('retry').hidden=false;}finally{busy=false;update();}}

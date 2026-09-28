@@ -43,6 +43,14 @@ run_static_checks() {
         -Itests/guitar_audio_stubs -Itests/guitar_stubs -Icomponents/bsp/include -Imain \
         tests/test_guitar_battery.c -o "${test_dir}/test_guitar_battery"
     "${test_dir}/test_guitar_battery"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror -Imain \
+        tests/test_guitar_idle.c main/guitar_idle.c main/guitar_player.c main/guitar_score.c \
+        -o "${test_dir}/test_guitar_idle"
+    "${test_dir}/test_guitar_idle"
+    "${CC:-cc}" -std=c11 -Wall -Wextra -Werror \
+        -Itests/guitar_power_stubs -Itests/guitar_audio_stubs -Itests/guitar_stubs -Icomponents/bsp/include -Imain \
+        tests/test_guitar_power.c main/guitar_idle.c -o "${test_dir}/test_guitar_power"
+    "${test_dir}/test_guitar_power"
     "${CC:-cc}" -std=gnu11 -Wall -Wextra -Werror -Itests/guitar_stubs -Imain \
         tests/test_guitar_service.c main/guitar_score.c -o "${test_dir}/test_guitar_service"
     "${test_dir}/test_guitar_service"

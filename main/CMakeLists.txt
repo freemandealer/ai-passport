@@ -6,6 +6,8 @@ idf_component_register(
          "guitar_metronome.c"
          "guitar_audio.c"
          "guitar_battery.c"
+         "guitar_idle.c"
+         "guitar_power.c"
          "guitar_ui.c"
          "guitar_service.c"
          "../assets/fonts/guitar_font_16.c"
